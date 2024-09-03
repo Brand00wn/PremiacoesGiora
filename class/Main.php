@@ -1767,12 +1767,24 @@ class Main extends DBConnection
                         $customer_phone
                     );
                 }
-                if ($this->settings->info("pay2m") == 1 && 0 < $total_amount) {
+                if ($this->settings->info("pay2m") == 1 && 
+                    0 < $total_amount) {
                     pay2m_generate_pix(
                         $oid,
                         $total_amount,
                         $customer_name,
                         $customer_cpf,
+                        $order_expiration
+                    );
+                }
+                if ($this->settings->info("payhub") == 1 && 
+                    0 < $total_amount) {
+                    payhub_generate_pix(
+                        $oid,
+                        $total_amount,
+                        $customer_name,
+                        $customer_email,
+                        $customer_phone,
                         $order_expiration
                     );
                 }

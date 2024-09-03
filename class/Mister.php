@@ -205,7 +205,7 @@ class Mister extends DBConnection
 
 			if ($this->settings->info('pay2m') == 1) {
 				if (empty($customer_cpf)) {
-					$resp['status'] = 'pay2m';
+					$resp['status'] = $this->settings->info('pay2m') == 1 ? 'pay2m' : 'payhub';
 					$resp['error'] = 'Seu cadastro precisa ser atualizado, por favor, adicione um CPF válido.';
 					$resp['redirect'] = BASE_URL . 'user/atualizar-cadastro';
 					flock($lock, LOCK_UN);
@@ -559,6 +559,10 @@ $order_numbers = implode(",", $numeris) . ",";
 				if (($this->settings->info('pay2m') == 1) && 0 < $total_amount) {
 					pay2m_generate_pix($oid, $total_amount, $customer_name, $customer_cpf, $order_expiration);
                     $resp['gateway'] = 'pay2m';
+				}
+				if (($this->settings->info('payhub') == 1) && 0 < $total_amount) {
+					payhub_generate_pix($oid, $total_amount, $customer_name, $customer_email, $customer_phone, $order_expiration);
+                    $resp['gateway'] = 'payhub';
 				}
 
 				if (!empty($ref)) {

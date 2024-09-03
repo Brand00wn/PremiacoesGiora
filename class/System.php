@@ -88,6 +88,12 @@ class System extends DBConnection
             } else {
                 $_POST['pay2m'] = '2';
             }
+
+            if (isset($_POST['payhub'])) {
+                $_POST['payhub'] = '1';
+            } else {
+                $_POST['payhub'] = '2';
+            }
         } else {
             if (isset($_POST['enable_cpf'])) {
                 $_POST['enable_cpf'] = '1';

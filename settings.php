@@ -1,6 +1,7 @@
 <?php
-
-
+require 'vendor/autoload.php';
+use Endroid\QrCode\QrCode;
+use Endroid\QrCode\Writer\PngWriter;
 
 function exibir_cabecalho($conn)
 {
@@ -503,6 +504,101 @@ function pay2m_set_webhook($tokenType, $accessToken)
     $response = json_decode(curl_exec($curl), true);
     curl_close($curl);
     return $response;
+}
+
+function payhub_generate_pix($oid, $amount, $client_name, $client_email, $client_phone, $order_expiration)
+{
+    global $_settings;
+    global $conn;
+
+    $amount = number_format((float) $amount, 2, '.', '');
+    $payhub_accesstoken = $_settings->info('payhub_accesstoken');
+    $expiresInDays = 3;
+    $installments = 1;
+
+    if (!$client_email) {
+        $client_email = 'no-reply@' . $_SERVER['SERVER_NAME'];
+    }
+
+    $data = array(
+        "amount" => $amount,
+        "customer" => array(
+            "name" => $client_name,
+            "email" => $client_email,
+            "phone" => $client_phone,
+            "docType" => "cpf",
+            "docNumber" => "78817541095",
+            "ip" => "string",
+            "fingerprint" => "string"
+        ),
+        "address" => array(
+            "country" => "BR",
+            "state" => "RS",
+            "city" => "Porto Alegre",
+            "zipcode" => "90430-115",
+            "street" => "Rua Largo Abelard Jacques Noronha",
+            "complement" => "",
+            "number" => 1
+        ),
+        "items" => array(
+            array(
+                "title" => 'Pedido #' . $oid,
+                "unitPrice" => $amount,
+                "quantity" => 1,
+                "tangible" => false,
+                "externalRef" => $oid
+            )
+        ),
+        "expiresInDays" => $expiresInDays,
+        "paymentMethod" => "pix",
+        "installments" => $installments
+    );
+
+    $url = 'https://api.payhubrasil.com/api/checkout/';
+    $curl = curl_init();
+    curl_setopt_array($curl, [
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_ENCODING => '',
+        CURLOPT_MAXREDIRS => 10,
+        CURLOPT_TIMEOUT => 0,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+        CURLOPT_CUSTOMREQUEST => 'POST',
+        CURLOPT_POSTFIELDS => json_encode($data),
+        CURLOPT_HTTPHEADER => ['Authorization: Token ' . $payhub_accesstoken, 'Content-Type: application/json']
+    ]);
+
+    $response = curl_exec($curl);
+    if (curl_errno($curl)) {
+        echo 'Erro: ' . curl_error($curl);
+        curl_close($curl);
+        return false;
+    }
+
+    curl_close($curl);
+    $payment = json_decode($response, true);
+
+    if (isset($payment['data']['pix']['qrCode']) && isset($payment['data']['id'])) {
+        $payment_method = 'Payhub';
+        $pix_code = $payment['data']['pix']['qrCode'];
+
+        $qrCode = new QrCode($pix_code);
+        $qrCode->setSize(300);
+
+        $writer = new PngWriter();
+        $result = $writer->write($qrCode);
+        $pix_qrcode = base64_encode($result->getString());
+
+        $code = $payment['data']['id'];
+        $sql = 'UPDATE order_list SET payment_method = \'' . $payment_method . '\', pix_code = \'' . $pix_code . '\', pix_qrcode = \'' . $pix_qrcode . '\', id_mp = \'' . $code . '\', order_expiration = \'' . $order_expiration . '\' WHERE id = ' . $oid;
+        
+        if ($conn->query($sql)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 function drope_gn_access_token($api_pix_certificate, $client_id, $client_secret)
